@@ -1,10 +1,11 @@
-""" library of QUA macros, wrappers for QUA """
+"""library of QUA macros, wrappers for QUA"""
 
 from qm import qua
 from qm.qua.lib import Cast
 from qm.qua._dsl import _Variable, _Expression
 
 from qcore.helpers.logger import logger
+from qcore.modes import Readout
 
 
 def align(*modes):
@@ -32,6 +33,32 @@ def reset_phase(*modes):
 
 def update_frequency(mode, value, units="Hz", keep_phase=False):
     qua.update_frequency(mode.name, value, units=units, keep_phase=keep_phase)
+
+
+def initialize_qubit(
+    rr: Readout,
+    readout_pulse: str,
+    demod_type: str,
+    threshold_g: float,
+    wait_time: int,
+    ro_ampx: float = 1.0,
+    n_consecutive: int = 3,
+):
+
+    I_temp = qua.declare(qua.fixed)
+    Q_temp = qua.declare(qua.fixed)
+    counter = qua.declare(int)
+    qua.assign(counter, 0)
+    with qua.while_(counter < n_consecutive):
+        rr.measure(readout_pulse, (I_temp, Q_temp), ampx=ro_ampx, demod_type=demod_type)
+        # increase counter if qubit is in g, reset it to 0 otherwise
+        with qua.if_(I_temp < threshold_g):
+            qua.assign(counter, counter + 1)
+        with qua.else_():
+            qua.assign(counter, 0)
+
+        # wait for RR to reset
+        wait(wait_time, rr.name)
 
 
 class StreamProcessingError(Exception):
