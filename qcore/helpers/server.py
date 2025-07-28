@@ -63,6 +63,7 @@ class Server:
         """ """
         logger.info("Disonnecting instruments...")
         for instrument in self._instruments:
+            print(instrument)
             if instrument.status:
                 instrument.disconnect()
 

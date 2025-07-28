@@ -14,7 +14,10 @@ import Pyro5.api as pyro
 from qcore.helpers.logger import logger
 from qcore.helpers import server
 import qcore.helpers.yamlizer as yml
+import yaml
 from qcore.resource import Resource
+from qcore.pulses.clear_readout_pulse import ClearReadoutPulse, DoubleClearReadoutPulse
+from qcore.pulses.readout_pulse import DoubleConstantReadoutPulse
 
 # these imports are needed for yamlizing to work
 from qcore.modes import *
@@ -46,7 +49,12 @@ class Stage:
         if self._configpath is not None:
             self._configpath.parent.mkdir(exist_ok=True)
             self._configpath.touch(exist_ok=True)
-            resources = yml.load(self._configpath)
+            try:
+                resources = yml.load(self._configpath)
+            except yaml.constructor.ConstructorError as E:
+                yml.register(ClearReadoutPulse)
+                yml.register(DoubleClearReadoutPulse)
+                yml.register(DoubleConstantReadoutPulse)
             if resources:
                 self.add(*resources)
 

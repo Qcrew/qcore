@@ -33,7 +33,38 @@ def reset_phase(*modes):
 def update_frequency(mode, value, units="Hz", keep_phase=False):
     qua.update_frequency(mode.name, value, units=units, keep_phase=keep_phase)
 
-
+def initialize_cavity(
+     rr,
+     qubit,
+     readout_pulse,
+     qubit_pulse,
+     demod_type: str,
+     threshold_g: float,
+     wait_time: int,
+     ro_ampx: float = 1.0,
+     n_consecutive: int = 3,
+ ):
+    I_temp = qua.declare(qua.fixed)
+    Q_temp = qua.declare(qua.fixed)
+    counter = qua.declare(int)
+    qua.assign(counter, 0)
+    with qua.while_(counter < n_consecutive):
+        qua.align()
+        qubit.play(qubit_pulse)
+        qua.align()
+        rr.measure(readout_pulse, (I_temp, Q_temp), ampx=ro_ampx, demod_type=demod_type)
+        qua.align()
+        # increase counter if qubit is in g, reset it to 0 otherwise
+        with qua.if_(I_temp > threshold_g):
+            qua.assign(counter, counter + 1)
+        with qua.else_():
+            qua.assign(counter, 0)
+        qubit.play(qubit_pulse)
+        qua.align()
+        # wait for RR to reset
+        wait(wait_time, rr)
+        
+        
 class StreamProcessingError(Exception):
     """ """
 

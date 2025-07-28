@@ -65,18 +65,26 @@ class ReadoutTrainerOctave:
         # Update readout with optimal weights
         weights = self._update_weights(norm_envelope_diff)
 
+        # Added by Adrian on 8th March to have proper x axis
+        xlist = np.linspace(0, len(env_e)-1,len(env_e)) * 64
+        # Added by Adrian on 8th March so both plots have same ylims
+        y_min = min( np.real(env_g).min(),  np.imag(env_g).min(), np.real(env_e).min(),  np.imag(env_e).min())
+        y_max = max( np.real(env_g).max(),  np.imag(env_g).max(), np.real(env_e).max(),  np.imag(env_e).max())
+        
         # Plot envelopes
         fig, axes = plt.subplots(2, 1, sharex=True, figsize=(7, 10))
-        axes[0].plot(1000 * np.real(env_g), label="Re")
-        axes[0].plot(1000 * np.imag(env_g), label="Imag")
+        axes[0].plot(xlist,1000 * np.real(env_g), label="Re")
+        axes[0].plot(xlist, 1000 * np.imag(env_g), label="Imag")
         axes[0].set_title("|g> envelope")
         axes[0].set_ylabel("Amplitude (mV)")
+        axes[0].set_ylim(1000*y_min*1.05, 1000*y_max*1.05)
         axes[0].legend()
-        axes[1].plot(1000 * np.real(env_e))
-        axes[1].plot(1000 * np.imag(env_e))
+        axes[1].plot(xlist, 1000 * np.real(env_e))
+        axes[1].plot(xlist, 1000 * np.imag(env_e))
         axes[1].set_title("|e> envelope")
         axes[1].set_ylabel("Amplitude (mV)")
         axes[1].set_xlabel("Time (ns)")
+        axes[1].set_ylim(1000*y_min*1.05, 1000*y_max*1.05)
         plt.show()
 
         return env_g, env_e
@@ -468,10 +476,10 @@ class ReadoutTrainerOctave:
         readout_pulse.threshold = threshold
 
     def _calculate_confusion_matrix(self, Ig_list, Ie_list, threshold):
-        pgg = 100 * round((np.sum(Ig_list > threshold) / len(Ig_list)), 3)
-        pge = 100 * round((np.sum(Ig_list < threshold) / len(Ig_list)), 3)
-        pee = 100 * round((np.sum(Ie_list < threshold) / len(Ie_list)), 3)
-        peg = 100 * round((np.sum(Ie_list > threshold) / len(Ie_list)), 3)
+        pgg = 100 * round((np.sum(Ig_list < threshold) / len(Ig_list)), 3)
+        pge = 100 * round((np.sum(Ig_list > threshold) / len(Ig_list)), 3)
+        pee = 100 * round((np.sum(Ie_list > threshold) / len(Ie_list)), 3)
+        peg = 100 * round((np.sum(Ie_list < threshold) / len(Ie_list)), 3)
         print("\nState prepared in |g>")
         print(f"   Measured in |g>: {pgg}%")
         print(f"   Measured in |e>: {pge}%")

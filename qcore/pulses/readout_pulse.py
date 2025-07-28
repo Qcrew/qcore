@@ -103,3 +103,49 @@ class ConstantReadoutPulse(ConstantPulse, ReadoutPulse):
 
 class GaussianReadoutPulse(GaussianPulse, ReadoutPulse):
     """ """
+    
+class DoubleConstantReadoutPulse(ReadoutPulse):
+    """ """
+    def __init__(
+        self,
+        name: str,
+        length: int = 1000,  # in ns
+        I_ampx: float = 1.0,
+        Q_ampx: Union[None, float] = 0.0,
+        pad: int = 0,
+        wait_time: int = 0,
+        **parameters,
+    ) -> None:
+        """ """
+        self.wait_time = wait_time
+        
+        super().__init__(
+            name=name,
+            length=length,
+            I_ampx=I_ampx,
+            Q_ampx=Q_ampx,
+            pad=pad,
+            **parameters,
+        )
+
+    @property
+    def total_I_amp(self) -> float:
+        """ """
+        return Pulse.BASE_AMP * self.I_ampx
+
+    def sample(self):
+        """ """
+        def constant_segment(amplitude, duration):
+            return np.full(int(duration), (Pulse.BASE_AMP * amplitude))
+        
+        # Construct the CLEAR pulse
+        const = constant_segment(self.total_I_amp, (self.length-self.wait_time)/2)
+        wait = constant_segment(0.0, self.wait_time)
+
+        waveform = np.concatenate([const, wait, const])
+
+        i_samples = np.real(waveform)
+        pad = np.zeros(self.pad) if self.pad else []
+
+        i_wave = np.concatenate((i_samples, pad))
+        return (i_wave.tolist(), 0.0) if self.has_mixed_waveforms() else (i_wave.tolist(), None)

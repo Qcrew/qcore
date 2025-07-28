@@ -1,4 +1,5 @@
 """ """
+
 from __future__ import annotations
 
 from ctypes import CDLL, c_int

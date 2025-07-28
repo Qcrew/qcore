@@ -251,10 +251,14 @@ class Experiment:
         sweeps: list[Sweep],
         datasets: list[Dataset],
         fetch_interval: int = 1,
+        current_value: float = None,  # fix for the DC currents loop in I_rr_spec_with_DC.py
         **kwargs,
     ) -> None:
         """ """
-        self.name = self.__class__.__name__
+        if current_value is None:
+            self.name = self.__class__.__name__
+        else:
+            self.name = self.__class__.__name__ + "_" + str(current_value * 1e3) + "_mA"
 
         self._folder = Path(folder)
         self._filepath = None  # will be set on run() with call to _get_filepath()
@@ -332,7 +336,7 @@ class Experiment:
                         logger.info(f"Set '{self.name}' attribute '{pulse_name}'.")
             mode.operations = selected_operations
 
-    def run(self):
+    def run(self,simulate=False):
         """ """
         outermost_sweep = list(self.sweeps.values())[0]
         try:
@@ -340,7 +344,10 @@ class Experiment:
                 self._run_with_qcore_sweep(outermost_sweep)
             else:
                 self._get_filepath()
-                self._run_qua_sweeps()
+                if simulate:
+                    self._run_qua_sweeps_simulate()
+                else:
+                    self._run_qua_sweeps()
         except KeyboardInterrupt:
             msg = f"Experiment '{self.name}' interrupted, closing QM now..."
             logger.info(msg)
@@ -405,6 +412,25 @@ class Experiment:
         """ """
         self._qm: QM = self._get_qm()
         qua_program = self._build_qua_program()
+        #####
+        # from qm import SimulationConfig
+        # import matplotlib.pyplot as plt
+        from qm import generate_qua_script
+
+        # sourceFile = open('debug.py', 'w')
+        print(generate_qua_script(qua_program, self._qm.get_config()))
+        # sourceFile.close()
+        # # Simulates the QUA program for the specified duration
+        # simulation_config = SimulationConfig(duration=1_000)  # In clock cycles = 4ns
+        # # Simulate blocks python until the simulation is done
+        # job = self._qm._qmm.simulate(
+        #     self._qm.get_config(), qua_program, simulation_config
+        # )
+        # # Plot the simulated samples
+        # job.get_simulated_samples().con1.plot()
+        # plt.show()
+
+        ##
         self._qm.execute(qua_program, self.repetitions)
 
         time.sleep(self.fetch_interval)
@@ -415,12 +441,16 @@ class Experiment:
         datasaver = Datasaver(self._filepath, *self.datasets.values())
 
         to_plot = [dset for dset in self.datasets.values() if dset.plot]
-        plotter = Plotter(self.fetch_interval, self.name, self._filepath, *to_plot)
+        
+        if len(to_plot) > 0:
+            plotter = Plotter(self.fetch_interval, self.name, self._filepath, *to_plot)
+        else:
+            plotter = None
 
         with datasaver:
             # datasaver.save_metadata(self.metadata)
             while self._qm.is_processing():
-                if plotter.stop_expt:
+                if plotter and plotter.stop_expt:
                     break
 
                 # fetch latest batch of partial data along with data counts
@@ -462,8 +492,8 @@ class Experiment:
                     # save datasets and sweeps (after updating) to datafile
                     for name, dataset in dsets_to_save.items():
                         datasaver.save_data(dataset)
-
-                plotter.plot(message=plot_msg)  # update live plot
+                if plotter:
+                    plotter.plot(message=plot_msg)  # update live plot
 
                 time.sleep(self.fetch_interval)
 
@@ -471,10 +501,164 @@ class Experiment:
             logger.info(f"{self.name} experiment has stopped running!")
 
             # plot final data batch and stop plotting loop
-            if exit_plotter:
-                plotter.plot(message=f"{plot_msg} [DONE]", stop=True, exit=True)
-            else:
-                plotter.plot(message=f"{plot_msg} [DONE]", stop=True)
+            # NOTE REMOVE the line below!
+            # exit_plotter = True
+            if plotter:
+                if exit_plotter:
+                    plotter.plot(message=f"{plot_msg} [DONE]", stop=True, exit=True)
+                else:
+                    plotter.plot(message=f"{plot_msg} [DONE]", stop=True)
+                    
+    def _run_qua_sweeps_simulate(self, qcore_sweep_point=None, exit_plotter=False):
+        """ """
+        self._qm: QM = self._get_qm()
+        qua_program = self._build_qua_program()
+        #####
+        from qm import SimulationConfig
+        import matplotlib.pyplot as plt
+        from qm import generate_qua_script
+        import os
+        import numpy as np
+        import json
+
+        # sourceFile = open('debug.py', 'w')
+        print(generate_qua_script(qua_program, self._qm.get_config()))
+        # sourceFile.close()
+        # # Simulates the QUA program for the specified duration
+        simulation_config = SimulationConfig(duration=4_000)  # In clock cycles = 4ns
+        # Simulate blocks python until the simulation is done
+        job = self._qm._qmm.simulate(
+            self._qm.get_config(), qua_program, simulation_config
+        )
+        # Plot the simulated samples
+        job.get_simulated_samples().con1.plot()
+        # plt.show()
+        
+        #job.get_simulated_samples()
+        # Define the directory where you want to save the file
+        # save_dir = r"C:\Users\qcrew\Documents\simulated_data"
+        # os.makedirs(save_dir, exist_ok=True)
+        # file_path = os.path.join(save_dir, "simulated_samples.json")
+
+        # Example data from job.get_simulated_samples()
+        data = job.get_simulated_samples()  # Assuming this returns a dictionary or list
+        print(type(data))
+        analog1 = data.con1.analog["1"]
+        analog2 = data.con1.analog["2"]
+        # analog3 = data.con1.analog["3"]
+        # analog4 = data.con1.analog["4"]
+        analog5 = data.con1.analog["5"]
+        analog6 = data.con1.analog["6"]
+        analog7 = data.con1.analog["7"]
+        analog8 = data.con1.analog["8"]
+        analog9 = data.con1.analog["9"]
+        analog10 = data.con1.analog["10"]
+        
+        import plotly.graph_objects as go
+        import plotly.express as px
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(y=analog1, mode='lines', name='rr_I'))
+        fig.add_trace(go.Scatter(y=analog2, mode='lines', name='rr_Q'))
+        # fig.add_trace(go.Scatter(y=analog3, mode='lines', name='Bob_I'))
+        # fig.add_trace(go.Scatter(y=analog4, mode='lines', name='Bob_Q'))
+        fig.add_trace(go.Scatter(y=analog5, mode='lines', name='Charlie_I'))
+        fig.add_trace(go.Scatter(y=analog6, mode='lines', name='Charlie_Q'))
+        fig.add_trace(go.Scatter(y=analog7, mode='lines', name='Bob_I'))
+        fig.add_trace(go.Scatter(y=analog8, mode='lines', name='Bob_Q'))
+        fig.add_trace(go.Scatter(y=analog9, mode='lines', name='qubit_I'))
+        fig.add_trace(go.Scatter(y=analog10, mode='lines', name='qubit_Q'))
+
+        #     # Customize layout
+        fig.update_layout(title="QM Simulator",
+                  xaxis_title="time(ns)",
+                  yaxis_title="a.u.",
+                  legend=dict(x=0, y=1))
+        fig.show()
+        
+        #json_compatible_data = {key: value.tolist() for key, value in data.items()}
+        # Save data to a JSON file
+        # with open(file_path, "w") as f:
+        #     json.dump(analog2, f, indent=4) 
+
+        ##
+        # self._qm.simulate(qua_program, self.repetitions)
+
+        # time.sleep(self.fetch_interval)
+
+        # dsets_to_save = {k: dset for k, dset in self.datasets.items() if dset.save}
+        # sweeps_to_save = {k: swp for k, swp in self._qua_sweeps.items() if swp.save}
+
+        # datasaver = Datasaver(self._filepath, *self.datasets.values())
+
+        # to_plot = [dset for dset in self.datasets.values() if dset.plot]
+        
+        # if len(to_plot) > 0:
+        #     plotter = Plotter(self.fetch_interval, self.name, self._filepath, *to_plot)
+        # else:
+        #     plotter = None
+
+        # with datasaver:
+        #     # datasaver.save_metadata(self.metadata)
+        #     while self._qm.is_processing():
+        #         if plotter and plotter.stop_expt:
+        #             break
+
+        #         # fetch latest batch of partial data along with data counts
+        #         data, prev_count, incoming_count = self._qm.fetch()
+        #         plot_msg = f": {incoming_count} / {self.repetitions} data batches"
+        #         if data:  # to prevent update when empty data dict is fetched
+        #             # update sweep data and save to datafile
+        #             for name, sweep in sweeps_to_save.items():
+        #                 if sweep.is_qua_sweep:
+        #                     sweep.update(data[name])
+        #                     datasaver.save_data(sweep)
+
+        #             # update primary datasets first
+        #             for name, dset in self.datasets.items():
+        #                 if name in self.primary_datasets:
+        #                     rawdata = (data[name], data[f"{name}_avg"])
+        #                     dset.update(rawdata, prev_count, incoming_count)
+
+        #             # update derived datasets
+        #             for name, dset in self.datasets.items():
+        #                 if dset.inputs:  # is derived dataset with datafn and inputs
+        #                     dsets = []
+        #                     for i in dset.inputs:
+        #                         if i in self.datasets:
+        #                             dsets.append(self.datasets[i])
+        #                         elif i in self.sweeps:
+        #                             dsets.append(self.sweeps[i])
+        #                     dset.update(dsets, prev_count, incoming_count)
+        #                     data[name] = dset.data
+
+        #             # process additional user-defined datasets in subclasses
+        #             self.process_data(
+        #                 data,
+        #                 prev_count,
+        #                 incoming_count,
+        #                 qcore_sweep_point,
+        #             )
+
+        #             # save datasets and sweeps (after updating) to datafile
+        #             for name, dataset in dsets_to_save.items():
+        #                 datasaver.save_data(dataset)
+        #         if plotter:
+        #             plotter.plot(message=plot_msg)  # update live plot
+
+        #         time.sleep(self.fetch_interval)
+
+        #     self._qm.disconnect()
+        #     logger.info(f"{self.name} experiment has stopped running!")
+
+        #     # plot final data batch and stop plotting loop
+        #     # NOTE REMOVE the line below!
+        #     # exit_plotter = True
+        #     if plotter:
+        #         if exit_plotter:
+        #             plotter.plot(message=f"{plot_msg} [DONE]", stop=True, exit=True)
+        #         else:
+        #             plotter.plot(message=f"{plot_msg} [DONE]", stop=True)
 
     def process_data(self, data, prev_count, incoming_count, qcore_sweep_point):
         """Subclass(es) to implement process_data()"""
@@ -531,6 +715,8 @@ class Experiment:
             modes=mode_lo_map.keys(),
             oscillators=mode_lo_map.values(),
             opx_plus=self.instruments.get("opx_plus"),
+            opx_one=self.instruments.get("opx_one"),
+            opx=self.instruments.get("opx_plus", self.instruments.get("opx1000")),
         )
 
     def _get_filepath(self) -> Path:
@@ -544,7 +730,7 @@ class Experiment:
             self._filepath = folderpath / filename
             logger.debug(f"Generated filepath {self._filepath} for '{self.name}'")
         return self._filepath
-    
+
     @property
     def metadata(self):
         """ """

@@ -8,7 +8,6 @@ from lmfit import Model
 from lmfit.models import LinearModel
 import numpy as np
 
-
 def create_params(**kwargs):
     """patch method because lmfit does not like working with np datatypes"""
     params = {}
@@ -171,50 +170,279 @@ def exp_decay_sine(y, x):
     return result.best_fit, result.best_values
 
 
-def char_func_coh_state_2(y,x):
+def char_func_coh_state_2(y, x):
     def fn(x, amp, alpha, ofs):
         scale = 2
-        return amp * np.exp(-np.abs(x*scale)**2 / 2) * np.cos(2 * alpha * x*scale) + ofs
-    
-    def params(y,x):
+        return (
+            amp * np.exp(-np.abs(x * scale) ** 2 / 2) * np.cos(2 * alpha * x * scale)
+            + ofs
+        )
+
+    def params(y, x):
         ofs = (y[0] + y[-1]) / 2
         peak_idx = np.argmax(abs(y - ofs))
         yrange = np.max(y) - np.min(y)
         ofs_min, ofs_max = np.min(y) - 0.3 * yrange, np.max(y) + 0.3 * yrange
         return create_params(
             ofs={"value": ofs, "min": ofs_min, "max": ofs_max},
-            amp={"value": y[peak_idx] - ofs, "min": -3 * yrange- ofs, "max": 3 * yrange- ofs},
-            alpha = 1.8,
+            amp={
+                "value": y[peak_idx] - ofs,
+                "min": -3 * yrange - ofs,
+                "max": 3 * yrange - ofs,
+            },
+            alpha=1.5,
         )
-    
-    
+
     result = Model(fn).fit(y, params(y, x), x=x)
     return result.best_fit, result.best_values
 
-def T1_coh(y, x):
-    def fn(x, amp, ofs, tau):
-        scale = 2
-        alpha = 2
-        beta = -0.4
-        chi = 2*np.pi *35.4e-6
-        kappa = 2*np.pi/tau
-        return np.real(amp * np.exp(-np.abs(beta*scale)**2 / 2) * np.cos(2 * beta* alpha *scale * np.exp(-0.5*(1j*chi+kappa)*x) ) + ofs)
-    
-    def params(y,x):
+def char_func_coh_state_3(y, x):
+    # set offset manually
+    def fn(x, alpha, amp, ofs):
+        #amp = 0.4
+        scale = 3 
+        #ofs = 0.48 # remove this if want to let the plotter decide.
+        return (
+            amp * np.exp(-np.abs(x * scale) ** 2 / 2) * np.cos(2 * alpha * x * scale)
+            + ofs
+        )
+
+    def params(y, x, alpha_guess=3):
         ofs = (y[0] + y[-1]) / 2
         peak_idx = np.argmax(abs(y - ofs))
         yrange = np.max(y) - np.min(y)
         ofs_min, ofs_max = np.min(y) - 0.3 * yrange, np.max(y) + 0.3 * yrange
-        tau_guess = (x[-1] - x[0]) / 5
         return create_params(
             ofs={"value": ofs, "min": ofs_min, "max": ofs_max},
-            amp={"value": y[peak_idx] - ofs, "min": -3 * yrange- ofs, "max": 3 * yrange- ofs},
-            tau={"value": tau_guess, "min":0, "max":5 * x[-1]},
+            amp={
+                "value": y[peak_idx] - ofs,
+                "min": -3 * yrange - ofs,
+                "max": 3 * yrange - ofs,
+            },
+            alpha=alpha_guess,
         )
+
+    # Try just two reasonable guesses - one high and one low
+    # This is fast enough for live plotting but gives flexibility
+    alpha_guesses = [1.0, 3.0, 5.0, 7.0, 10.0, 12.0]#, 10.0]#, 8.0, 11.0, 15.0]  # Low and high alpha values
     
+    best_result = None
+    best_chisqr = float('inf')
     
+    for alpha_guess in alpha_guesses:
+        # Create model with current alpha guess
+        model = Model(fn)
+        result = model.fit(y, params(y, x, alpha_guess), x=x)
+        
+        # Check if this is the best fit
+        if result.chisqr < best_chisqr:
+            best_chisqr = result.chisqr
+            best_result = result
+    
+    return best_result.best_fit, best_result.best_values
+
+
+def cat_and_back_sigma_x(y, x):
+    def fn(
+        x,
+        amp,
+        ofs,
+        eta_0,
+        eta_2,
+        eta_4,
+        xi,
+    ):
+        scale = 2
+        return (
+            amp
+            * (
+                1
+                - eta_0
+                - eta_2 * (np.abs(x * scale)) ** 2
+                - eta_4 * (np.abs(x * scale)) ** 4
+            )
+            * np.cos(2 * xi * (np.abs(x * scale)) ** 2)
+            + ofs
+        )
+
+    def params(y, x):
+        ofs = (y[0] + y[-1]) / 2
+        amp_0 = np.max(y) - ofs
+        yrange = np.max(y) - np.min(y)
+        index_y_min = np.argmin(abs(y - ofs))
+        ofs_min, ofs_max = np.min(y) - 0.3 * yrange, np.max(y) + 0.3 * yrange
+        xi_val = x[index_y_min] / (2 * (np.abs(np.average(x))) ** 2)
+        return create_params(
+            ofs={"value": ofs, "min": ofs_min, "max": ofs_max},
+            amp={
+                "value": y[peak_idx] - ofs,
+                "min": -3 * yrange - ofs,
+                "max": 3 * yrange - ofs,
+            },
+            eta_0={"value": 0.01, "min": 0, "max": 1 / 3},
+            eta_2={"value": 0.01, "min": 0, "max": 1 / 3},
+            eta_4={"value": 0.01, "min": 0, "max": 1 / 3},
+            xi={"value": xi_val, "min": 0, "max": 1},
+        )
+
     result = Model(fn).fit(y, params(y, x), x=x)
     return result.best_fit, result.best_values
+
+
+def cat_and_back(y, x):
+    scale = 6
+
+    def fn(x, amp, ofs, xi, eta_0, eta_2, eta_4):
+        argument = 2 * xi * (np.abs(x * scale)) ** 2
+        return (
+            amp
+            * (
+                1
+                - eta_0
+                - eta_2 * (np.abs(x * scale)) ** 2
+                - eta_4 * (np.abs(x * scale)) ** 4
+            )
+            * np.cos(argument)
+            + ofs
+        )
+
+    def params(y, x):
+        ofs = (np.max(y) + np.min(y)) / 2
+        amp_0 = np.max(y) - ofs
+        yrange = np.max(y) - np.min(y)
+        ofs_min, ofs_max = np.min(y) - 0.3 * yrange, np.max(y) + 0.3 * yrange
+        xi_val = np.pi * 1 / (2 * (scale * x[np.argmin(y)]) ** 2)
+
+        return create_params(
+            ofs={"value": ofs, "min": ofs_min, "max": ofs_max},
+            amp={
+                "value": amp_0,
+                "min": -3 * yrange - ofs,
+                "max": 3 * yrange - ofs,
+            },
+            eta_0={
+                "value": np.float64(0.01),
+                "min": np.float64(0),
+                "max": np.float64(1 / 4),
+            },
+            eta_2={
+                "value": np.float64(0.01),
+                "min": np.float64(0),
+                "max": np.float64(1 / 4),
+            },
+            eta_4={
+                "value": np.float64(0.01),
+                "min": np.float64(0),
+                "max": np.float64(1 / 4),
+            },
+            xi={"value": xi_val},
+        )
+
+    result = Model(fn).fit(y, params(y, x), x=x)
+    return result.best_fit, result.best_values
+
+
+def T1_cav_char_point_chi(y, x):
+    scale = 2
+    beta = 1
+
+    def fn(x, amp, ofs, tau, alpha, phi):
+        Delta = Charlie["chi"] / 2
+
+        alpha = alpha * np.exp(-1j * (Delta * x + phi) - x / (tau * 2))
+        # char_point = ofs + amp * np.exp(-1 / 2 * np.abs(beta * scale) ** 2) * np.exp(
+        #     -1j * np.imag(alpha * np.conjugate(beta * scale))
+        # )
+        return np.real(
+            amp
+            * np.exp(-np.abs(beta * scale) ** 2 / 2)
+            * np.cos(2 * beta * alpha * scale * np.exp(-0.5 * (1j * Delta) * x))
+            + ofs
+        )
+        # return np.real(char_point)
+
+    def params(y, x):
+        ofs = (np.max(y) + np.min(y)) / 2
+        amp_0 = np.max(y) - ofs
+        yrange = np.max(y) - np.min(y)
+        ofs_min, ofs_max = np.min(y) - 0.7 * yrange, np.max(y) + 0.7 * yrange
+        tau_guess = np.float64(1e5)
+        alpha_guess = np.float64(4)
+        phi_guess = 0
+        return create_params(
+            ofs={"value": ofs, "min": ofs_min, "max": ofs_max},
+            amp={
+                "value": amp_0 - ofs,
+                "min": -1.5 * yrange - ofs,
+                "max": 1.5 * yrange - ofs,
+            },
+            tau={"value": tau_guess, "min": 0, "max": 5 * x[-1]},
+            alpha={
+                "value": alpha_guess,
+                "min": np.float64(3.5),
+                "max": np.float64(4.5),
+            },  # edit this
+            phi={
+                "value": phi_guess,
+                "min": np.float64(0),
+                "max": np.float64(np.pi),
+            },
+        )
+
+    result = Model(fn).fit(y, params(y, x), x=x)
+    return result.best_fit, result.best_values
+
+
+def T1_cav_char_point(y, x):
+    def fn(x, amp, ofs, tau, alpha, phi):
+        scale = 2
+        beta = 1
+        chi = 0  # Alice["chi"]
+        kappa = 1 / tau
+        return np.real(
+            amp
+            * np.exp(-np.abs(beta * scale) ** 2 / 2)
+            * np.cos(
+                2
+                * beta
+                * alpha
+                * scale
+                * np.exp(-0.5 * (1j * chi + kappa) * x + 1j * phi)
+            )
+            + ofs
+        )
+
+    def params(y, x):
+        ofs = (np.max(y) + np.min(y)) / 2
+        amp_0 = np.max(y) - ofs
+        yrange = np.max(y) - np.min(y)
+        ofs_min, ofs_max = np.min(y) - 0.7 * yrange, np.max(y) + 0.7 * yrange
+        tau_guess = np.float64(1e5)
+        alpha_guess = np.float64(8)
+        phi_guess = np.float64(0.4)
+        return create_params(
+            ofs={"value": ofs, "min": ofs_min, "max": ofs_max},
+            amp={
+                "value": amp_0 - ofs,
+                "min": -1.5 * yrange - ofs,
+                "max": 1.5 * yrange - ofs,
+            },
+            tau={"value": tau_guess, "min": 0, "max": 5 * x[-1]},
+            alpha={
+                "value": alpha_guess,
+                "min": np.float64(2),
+                "max": np.float64(5),
+            },  # edit this
+            phi={
+                "value": phi_guess,
+                "min": np.float64(0),
+                "max": np.float64(2 * np.pi),
+            },
+        )
+
+    result = Model(fn).fit(y, params(y, x), x=x)
+    return result.best_fit, result.best_values
+
 
 def gaussian(y, x):
     """ """
@@ -335,7 +563,6 @@ def lorentzian_asymmetric(y, x):
 
 
 def sine(y, x, return_params=False):
-    
     """ """
 
     def fn(x, f0, ofs, amp, phi):
@@ -363,31 +590,29 @@ def sine(y, x, return_params=False):
 
 
 def sine_gf(y, x, return_params=False):
-    
+
     def fn(x, f0, ofs, amp, phi):
-        return ofs + amp * np.sin(2*np.pi*f0*x**2 + phi)
-    
-    
+        return ofs + amp * np.sin(2 * np.pi * f0 * x**2 + phi)
+
     def params(y, x):
         """ """
         fs = np.fft.rfftfreq(len(x), x[1] - x[0])
         ofs = np.mean(y)
         fft = np.fft.rfft(y - ofs)
         idx = np.argmax(abs(fft))
-        
+
         return create_params(
             f0={"value": fs[idx], "min": fs[0], "max": fs[-1]},
             ofs={"value": ofs, "min": np.min(y), "max": np.max(y)},
             amp={"value": np.std(y - ofs), "min": 0, "max": np.max(y) - np.min(y)},
             phi={"value": np.angle(fft[idx]), "min": -2 * np.pi, "max": 2 * np.pi},
         )
-    
+
     fit_params = params(y, x)
     if return_params:
         return fit_params
     result = Model(fn).fit(y, fit_params, x=x)
     return result.best_fit, result.best_values
-        
 
 
 FITFN_MAP = {
