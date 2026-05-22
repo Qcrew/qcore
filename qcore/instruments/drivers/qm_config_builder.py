@@ -63,6 +63,8 @@ class QMConfigBuilder:
             config.set_controllers()
         for mode in modes:
             config.set_ports(mode)
+            config.set_cores(mode.name, mode.core) # Adrian 10/10/2025
+            config.set_upconverters(mode.name, mode.upconverter) # Adrian 10/10/2025
             config.set_intermediate_frequency(mode.name, mode.int_freq)
 
             if mode.has_mixed_inputs():
@@ -90,7 +92,6 @@ class QMConfigBuilder:
             config.infer_mw_fem_settings()
             
         self._config = json.loads(json.dumps(self._config))  # convert recursively to `dict` from `defaultdict`
-
 
     def _check_modes(self, *modes: Mode) -> None:
         """ """

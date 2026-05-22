@@ -11,6 +11,12 @@ from qcore.pulses.pulse import Pulse
 from qcore.modes import Qubit
 
 
+def frame_rotation_2pi(angle, *modes):
+    """ """
+    qua.frame_rotation_2pi(angle, *(mode.name for mode in modes))
+
+
+
 def align(*modes):
     """ """
     qua.align(*(mode.name for mode in modes))
@@ -87,15 +93,18 @@ def initialize_cavity_AND_qubit(
 
     I_temp = qua.declare(qua.fixed)
     Q_temp = qua.declare(qua.fixed)
+
     I_temp2 = qua.declare(qua.fixed)
     Q_temp2 = qua.declare(qua.fixed)
+
     counter = qua.declare(int)
     qua.assign(counter, 0)
+    
     with qua.while_(counter < n_consecutive):
-        qua.align()
         qubit.play(qubit_pulse)  
         qua.align()
         rr.measure(readout_pulse, (I_temp, Q_temp), ampx=ro_ampx, demod_type=demod_type)
+        wait(wait_time, rr)
         qua.align()
 
         # increase counter if qubit is in g, reset it to 0 otherwise
@@ -106,9 +115,8 @@ def initialize_cavity_AND_qubit(
         
         qubit.play(qubit_pulse)  
         qua.align()
-        wait(wait_time, rr)
-        qua.align()
         rr.measure(readout_pulse, (I_temp2, Q_temp2), ampx=ro_ampx, demod_type=demod_type)
+        wait(wait_time, rr)
         qua.align()
         # increase counter if qubit is in g, reset it to 0 otherwise
         with qua.if_((I_temp > threshold_g) & (I_temp2 < threshold_g)):
@@ -116,8 +124,62 @@ def initialize_cavity_AND_qubit(
         with qua.else_():
             qua.assign(counter, 0)
 
-        # wait for RR to reset
-        wait(wait_time, rr)
+def initialize_both_cavities(
+     rrA: Readout,
+     qA: Qubit, 
+     rrB: Readout,
+     qB: Qubit, 
+     readoutA_pulse: Pulse,
+     qA_pulse: Pulse, 
+     readoutB_pulse: Pulse,
+     qB_pulse: Pulse, 
+     demod_type: str,
+     thresholdA_g: float,
+     thresholdB_g: float,
+     wait_time: int,
+     ro_ampx: float = 1.0,
+     n_consecutive: int = 3,
+ ):
+
+    I_tempA = qua.declare(qua.fixed)
+    Q_tempA = qua.declare(qua.fixed)
+    I_tempB = qua.declare(qua.fixed)
+    Q_tempB = qua.declare(qua.fixed)
+    I_temp2A = qua.declare(qua.fixed)
+    Q_temp2A = qua.declare(qua.fixed)
+    I_temp2B = qua.declare(qua.fixed)
+    Q_temp2B = qua.declare(qua.fixed)
+    counter = qua.declare(int)
+
+    qua.assign(counter, 0)
+    
+    with qua.while_(counter < n_consecutive):
+        qA.play(qA_pulse)
+        qB.play(qB_pulse)
+        qua.align()
+
+        rrA.measure(readoutA_pulse, (I_tempA, Q_tempA), ampx=ro_ampx, demod_type=demod_type)
+        rrB.measure(readoutB_pulse, (I_tempB, Q_tempB), ampx=ro_ampx, demod_type=demod_type)
+        wait(wait_time, rrA, rrB)
+        qua.align()
+
+        qA.play(qA_pulse)
+        qB.play(qB_pulse)
+        qua.align()
+
+        rrA.measure(readoutA_pulse, (I_temp2A, Q_temp2A), ampx=ro_ampx, demod_type=demod_type)
+        rrB.measure(readoutB_pulse, (I_temp2B, Q_temp2B), ampx=ro_ampx, demod_type=demod_type)
+        wait(wait_time, rrA, rrB)
+        qua.align()
+        
+        # increase counter if qubit is in g, reset it to 0 otherwise
+        with qua.if_( (I_tempA > thresholdA_g) & (I_temp2A < thresholdA_g) & (I_tempB > thresholdB_g) & (I_temp2B < thresholdB_g) ):
+            qua.assign(counter, counter + 1)
+        with qua.else_():
+            qua.assign(counter, 0)
+
+
+
 
 def initialize_qubit(
      rr: Readout,
@@ -143,6 +205,7 @@ def initialize_qubit(
 
         # wait for RR to reset
         wait(wait_time, rr)
+        qua.align()
 
 class StreamProcessingError(Exception):
     """ """

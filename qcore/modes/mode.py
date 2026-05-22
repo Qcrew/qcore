@@ -11,7 +11,6 @@ from qcore.pulses.digital_waveform import DigitalWaveform
 from qcore.pulses.readout_pulse import ReadoutPulse
 from qcore.resource import Resource
 
-
 FEMPort = Tuple[int, int]
 
 class Mode(Resource):
@@ -26,14 +25,17 @@ class Mode(Resource):
         name: str,
         lo_name: str,
         ports: dict[str, int],
+        core: str = None, # Adrian 10/10/2025
         int_freq: float = -50e6,
+        upconverter: int = None,
         **parameters,
     ) -> None:
         """ """
         self.octave_mixed: bool = False
         self.lo_name: str = str(lo_name)
         self.int_freq: float = int_freq
-
+        self.core: str = core # Adrian 10/10/2025
+        self.upconverter: int = upconverter
         self._ports: dict[str, Union[int, FEMPort]] = dict.fromkeys(Mode.PORTS_KEYS)
         self._mixer_offsets: dict[str, float] = dict.fromkeys(self.OFFSETS_KEYS, 0.0)
         self._rf_switch: RFSwitch = None
@@ -181,7 +183,7 @@ class Mode(Resource):
         """ """
         return [self._operations[k] for k in names if k in self._operations]
 
-    def play(self, pulse: Pulse, ampx=1.0, phase=0.0, **kwargs) -> None:
+    def play(self, pulse: Pulse, constant_length = 1, ampx=1.0, phase=0.0, **kwargs) -> None:
         """ """
         op_name = self._pulse_op_map[pulse.name]
 
@@ -205,6 +207,6 @@ class Mode(Resource):
             qua.play(op_name * qua.amp(*ampx), self.name, **kwargs)
             
         if isinstance(phase, _Variable):
-            qua.frame_rotation_2pi(phase, self.name)
+            qua.frame_rotation_2pi(-phase, self.name) # Adrian: this was positive, but idk why
         elif phase:
             qua.frame_rotation_2pi(-phase, self.name)

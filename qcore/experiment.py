@@ -7,8 +7,8 @@ from pathlib import Path
 import time
 
 import qm.qua as qua
-from qm.qua._dsl import _ProgramScope, _Variable, _ResultSource
-
+from qm.qua._dsl import _Variable, _ResultSource
+from qm import generate_qua_script, Program
 from qcore.instruments.instrument import Instrument
 from qcore.instruments import QM
 from qcore.helpers.datasaver import Datasaver
@@ -229,8 +229,6 @@ class ExperimentManager:
 
             if dset.axes is None:
                 dset.initialize(axes=list(sweep_dict.values()))
-            else:
-                dset.initialize(axes=dset.axes)
 
 
 class Experiment:
@@ -242,7 +240,7 @@ class Experiment:
     # these name(s) must be specified as Sweep objects in the 'sweeps' list
     primary_sweeps: list = []  # to be specified by child classes
 
-    MAX_SWEEPS: int = 4  # maximum number of Sweeps allowed per experiment run
+    MAX_SWEEPS: int = 6  # maximum number of Sweeps allowed per experiment run
     DATAFILE_SUFFIX: str = ".hdf5"
 
     def __init__(
@@ -306,7 +304,6 @@ class Experiment:
 
                 if sweep.name == "N":
                     self.repetitions = sweep.length
-
         self._manager.init_datasets(self.datasets, primary_datasets, self._qua_sweeps)
         for dataset in self.datasets.values():
             if dataset.stream:  # is qua dataset
@@ -339,14 +336,14 @@ class Experiment:
                         logger.info(f"Set '{self.name}' attribute '{pulse_name}'.")
             mode.operations = selected_operations
 
-    def run(self,simulate=False):
+    def run(self,simulate=False, filename_suffix=None):
         """ """
         outermost_sweep = list(self.sweeps.values())[0]
         try:
             if not outermost_sweep.is_qua_sweep:
                 self._run_with_qcore_sweep(outermost_sweep)
             else:
-                self._get_filepath()
+                self._get_filepath(filename_suffix)
             if simulate:
                 self._run_qua_sweeps_simulate()
             else:
@@ -421,6 +418,9 @@ class Experiment:
         """ """
         self._qm: QM = self._get_qm()
         qua_program = self._build_qua_program()
+
+        with open("qua_prog.py", "w+") as f:
+            f.write(generate_qua_script(qua_program, self._qm.get_config()))
         self._qm.execute(qua_program, self.repetitions)
 
         time.sleep(self.fetch_interval)
@@ -507,51 +507,91 @@ class Experiment:
         from qm import generate_qua_script
         import os
         import numpy as np
+        import plotly.graph_objects as go
+
         import json
         # sourceFile = open('debug.py', 'w')
-        print(generate_qua_script(qua_program, self._qm.get_config()))
+        # print(generate_qua_script(qua_program, self._qm.get_config()))
         # sourceFile.close()
+
         # # Simulates the QUA program for the specified duration
-        simulation_config = SimulationConfig(duration=8000//4)  # In clock cycles = 4ns
+        simulation_config = SimulationConfig(duration=40000//4)  # In clock cycles = 4ns
         # Simulate blocks python until the simulation is done
-        job = self._qm._qmm.simulate(
-            self._qm.get_config(), qua_program, simulation_config
-        )
-        # Plot the simulated samples
-        job.get_simulated_samples().con1.plot()
-        # plt.show()
-        #job.get_simulated_samples()
+        job = self._qm._qmm.simulate(self._qm.get_config(), qua_program, simulation_config)
+        
+        with open("qua_prog.py", "w+") as f:
+            f.write(generate_qua_script(qua_program, self._qm.get_config()))
+        self._qm.execute(qua_program, self.repetitions)
         # Define the directory where you want to save the file
         # save_dir = r"C:\Users\qcrew\Documents\simulated_data"
         # os.makedirs(save_dir, exist_ok=True)
         # file_path = os.path.join(save_dir, "simulated_samples.json")
-        # Example data from job.get_simulated_samples()
+
         data = job.get_simulated_samples()  # Assuming this returns a dictionary or list
-        print(type(data))
-        analog1 = data.con1.analog["1"]
-        analog2 = data.con1.analog["2"]
-        analog3 = data.con1.analog["3"]
-        analog4 = data.con1.analog["4"]
-        # analog5 = data.con1.analog["5"]
-        # analog6 = data.con1.analog["6"]
-        # analog7 = data.con1.analog["7"]
-        # analog8 = data.con1.analog["8"]
-        analog9 = data.con1.analog["9"]
-        analog10 = data.con1.analog["10"]
-        import plotly.graph_objects as go
-        import plotly.express as px
+        data.con1.plot()
+        # Plot the simulated samples
+
         fig = go.Figure()
-        fig.add_trace(go.Scatter(y=analog1, mode='lines', name='rr_I'))
-        fig.add_trace(go.Scatter(y=analog2, mode='lines', name='rr_Q'))
-        fig.add_trace(go.Scatter(y=analog3, mode='lines', name='qubit_I'))
-        fig.add_trace(go.Scatter(y=analog4, mode='lines', name='qubit_Q'))
-        # fig.add_trace(go.Scatter(y=analog5, mode='lines', name='qubit_I'))
-        # fig.add_trace(go.Scatter(y=analog6, mode='lines', name='qubit_Q'))
-        # fig.add_trace(go.Scatter(y=analog7, mode='lines', name='Charlie_I'))
-        # fig.add_trace(go.Scatter(y=analog8, mode='lines', name='Charlie_Q'))
-        fig.add_trace(go.Scatter(y=analog9, mode='lines', name='Bob_I'))
-        fig.add_trace(go.Scatter(y=analog10, mode='lines', name='Bob_Q'))
-        #     # Customize layout
+
+        # List of (key, label) pairs
+        analog_keys = [
+            ("3-1-1", "rrA"),
+            ("3-2-1", "empty"),
+            ("3-3-1", "qC"),
+            ("3-3-2", "drive"),
+            ("3-4-1", "cavB"),
+            ("3-5-1", "cavA"),
+            ("3-6-1", "qA"),
+            ("3-7-1", "qB"),
+            ("3-7-2", "probe"),
+            ("3-8-1", "rrB"),
+            ("1-8-1", "rrC"),
+        ]
+        offset = 0
+        for key, label in analog_keys:
+            try:
+                dataset = data.con1.analog[key] #data['con1']['analog'][key]
+                y = np.real(np.array(dataset)) + offset
+                offset += 0.1 # visual separation between traces
+                if y.size == 0:
+                    print(f"⚠️ {label} ({key}) is empty, skipping.")
+                    continue
+                
+                fig.add_trace(go.Scatter(y=y, mode='lines', name=label))
+
+            except KeyError:
+                print(f"⚠️ Key '{key}' not found in data['con1']['analog'], skipping.")
+            except Exception as e:
+                print(f"⚠️ Error loading '{key}' ({label}): {e}")
+
+        digital_keys = [
+            ("1-1", "Digital marker 1"),
+            ("1-2", "Digital marker 2"),
+            ("1-3", "Digital marker 3"),
+            ("1-4", "Digital marker 4"),
+            ("1-5", "Digital marker 5"),
+            ("1-6", "Digital marker 6"),
+            ("1-7", "Digital marker 7"),
+            ("1-8", "Digital marker 8"),
+        ]
+
+        for key, label in digital_keys:
+            try:
+                dataset = data.con1.digital[key] #data['con1']['analog'][key]
+                y = np.real(np.array(dataset)) + offset
+                offset += 0.1 # visual separation between traces
+                if y.size == 0:
+                    print(f"⚠️ {label} ({key}) is empty, skipping.")
+                    continue
+                
+                fig.add_trace(go.Scatter(y=y, mode='lines', name=label))
+
+            except KeyError:
+                print(f"⚠️ Key '{key}' not found in data['con1']['digital'], skipping.")
+            except Exception as e:
+                print(f"⚠️ Error loading '{key}' ({label}): {e}")
+
+        # #     # Customize layout
         fig.update_layout(title="QM Simulator",
                   xaxis_title="time(ns)",
                   yaxis_title="a.u.",
@@ -563,7 +603,7 @@ class Experiment:
         """Subclass(es) to implement process_data()"""
         pass
 
-    def _build_qua_program(self) -> _ProgramScope:
+    def _build_qua_program(self) -> Program:
         """ """
         # enter QUA program scope
         with qua.program() as qua_program:
@@ -595,7 +635,6 @@ class Experiment:
                         sweep.process_stream()
                 for dataset in self._qua_datasets.values():
                     dataset.process_stream()
-
         return qua_program
 
     def _get_qm(self):
@@ -618,14 +657,17 @@ class Experiment:
             config_path=f"{self._folder}/config"
         )
 
-    def _get_filepath(self) -> Path:
+    def _get_filepath(self, filename_suffix = None) -> Path:
         """ """
         if self._filepath is None:
             date, time = datetime.now().strftime("%Y-%m-%d %H-%M-%S").split()
             datafolder = self._folder / "data"
             datafolder.mkdir(exist_ok=True)
             folderpath = datafolder / date
-            filename = f"{time}_{self.name}{Experiment.DATAFILE_SUFFIX}"
+            if filename_suffix:
+                filename = f"{time}_{self.name}_{filename_suffix}{Experiment.DATAFILE_SUFFIX}"
+            else:
+                filename = f"{time}_{self.name}{Experiment.DATAFILE_SUFFIX}"
             self._filepath = folderpath / filename
             logger.debug(f"Generated filepath {self._filepath} for '{self.name}'")
         return self._filepath

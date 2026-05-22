@@ -21,13 +21,18 @@ class ReadoutTrainerOctave:
         self,
         rr: Mode,
         qubit: Mode,
+        qubit_GRAPE: Mode, #Celine
         qubitEF: Mode,
+        cavity: Mode, #Celine
         qm,
         reps,
         wait_time,
         readout_pulse,
         qubit_pi_pulse,
         qubitEF_pi_pulse = None,
+        coherent_pulse = None, #Celine
+        grape_cav_pulse = None, #Celine
+        grape_q_pulse = None, #Celine
         ddrop_params=None,
         weights_file_path=None,
     ):
@@ -35,6 +40,8 @@ class ReadoutTrainerOctave:
         self._rr: Mode = rr
         self._qubit: Mode = qubit
         self._qubitEF: Mode = qubitEF
+        self._qubit_GRAPE: Mode = qubit_GRAPE #Celine
+        self._cavity: Mode = cavity #Celine
         self._qm = qm
         self.modes = [rr, qubit]
         self.mode_names = [mode.name for mode in self.modes]
@@ -43,6 +50,9 @@ class ReadoutTrainerOctave:
         self.readout_pulse = readout_pulse
         self.qubit_pi_pulse = qubit_pi_pulse
         self.qubitEF_pi_pulse = qubitEF_pi_pulse
+        self.coherent_pulse = coherent_pulse #Celine
+        self.grape_cav_pulse = grape_cav_pulse #Celine
+        self.grape_q_pulse = grape_q_pulse #Celine
         self.ddrop_params = ddrop_params
         self.weights_file_path = weights_file_path
 
@@ -182,6 +192,7 @@ class ReadoutTrainerOctave:
         wait_time = self.wait_time
         (readout_pulse,) = self._rr.get_operations(self.readout_pulse)
         (qubit_pi_pulse,) = self._qubit.get_operations(self.qubit_pi_pulse)
+        (coherent_pulse,) = self._cavity.get_operations(self.coherent_pulse) #Celine
 
         number_of_divisions = int( (readout_pulse.length + readout_pulse.pad) / (4 * DIVISION_LEN) )
 
@@ -207,6 +218,10 @@ class ReadoutTrainerOctave:
 
                 if self.ddrop_params:
                     self._macro_DDROP_reset()
+
+                # if self.coherent_pulse is not None: #Celine
+                #     self._cavity.play(coherent_pulse) #Celine
+                #     qua.align(self._cavity, self._qubit, self._rr) #Celine
 
                 if excite_qubit:
                     # qua.align("FLUX", self._qubit.name)
@@ -240,6 +255,7 @@ class ReadoutTrainerOctave:
         (readout_pulse,) = self._rr.get_operations(self.readout_pulse)
         (qubit_pi_pulse,) = self._qubit.get_operations(self.qubit_pi_pulse)
         (qubitEF_pi_pulse,) = self._qubitEF.get_operations(self.qubitEF_pi_pulse)
+        (coherent_pulse,) = self._cavity.get_operations(self.coherent_pulse) #Celine
 
         number_of_divisions = int(
             (readout_pulse.length + readout_pulse.pad) / (4 * DIVISION_LEN)
@@ -267,6 +283,10 @@ class ReadoutTrainerOctave:
 
                 if self.ddrop_params:
                     self._macro_DDROP_reset()
+                
+                # if self.coherent_pulse is not None: #Celine
+                #     self._cavity.play(coherent_pulse) #Celine
+                #     qua.align(self._cavity, self._qubit, self._rr) #Celine
 
                 if excite_qubit:
                     # qua.align("FLUX", self._qubit.name)
@@ -567,6 +587,7 @@ class ReadoutTrainerOctave:
 
         (readout_pulse,) = self._rr.get_operations(self.readout_pulse)
         (qubit_pi_pulse,) = self._qubit.get_operations(self.qubit_pi_pulse)
+        (coherent_pulse,) = self._cavity.get_operations(self.coherent_pulse) #Celine
 
         with qm_qua.program() as acquire_IQ:
             I = qm_qua.declare(qm_qua.fixed)
@@ -579,6 +600,10 @@ class ReadoutTrainerOctave:
 
                 if self.ddrop_params:
                     self._macro_DDROP_reset()
+
+                if self.coherent_pulse is not None: #Celine
+                    self._cavity.play(coherent_pulse) #Celine
+                    qua.align(self._cavity, self._qubit, self._rr) #Celine
 
                 if excite_qubit:
                     # qua.align(self._rr.name, self._qubit.name)
@@ -601,6 +626,9 @@ class ReadoutTrainerOctave:
         (readout_pulse,) = self._rr.get_operations(self.readout_pulse)
         (qubit_pi_pulse,) = self._qubit.get_operations(self.qubit_pi_pulse)
         (qubitEF_pi_pulse,) = self._qubitEF.get_operations(self.qubitEF_pi_pulse)
+        (coherent_pulse,) = self._cavity.get_operations(self.coherent_pulse) #Celine
+        (grape_cav_pulse,) = self._cavity.get_operations(self.grape_cav_pulse) #Celine
+        (grape_q_pulse,) = self._qubit_GRAPE.get_operations(self.grape_q_pulse) #Celine
 
         with qm_qua.program() as acquire_IQ:
             I = qm_qua.declare(qm_qua.fixed)
@@ -614,9 +642,15 @@ class ReadoutTrainerOctave:
                 if self.ddrop_params:
                     self._macro_DDROP_reset()
 
+                if self.coherent_pulse is not None: #Celine
+                    # self._cavity.play(coherent_pulse) #Celine
+                    self._cavity.play(grape_cav_pulse) #Celine
+                    self._qubit_GRAPE.play(grape_q_pulse) #Celine
+                    qua.align(self._cavity, self._qubit, self._qubit_GRAPE, self._rr) #Celine
+
                 if excite_qubit:
-                    # qua.align(self._rr.name, self._qubit.name)
                     self._qubit.play(qubit_pi_pulse)
+                    # self._qubit.play(qubit_pi_pulse)
                     qua.align(self._qubitEF, self._qubit)
                     self._qubitEF.play(qubitEF_pi_pulse)
                     qua.align(self._rr, self._qubitEF)

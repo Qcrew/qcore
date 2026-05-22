@@ -207,7 +207,6 @@ class ReadoutTrainerOctave:
 
                 if self.ddrop_params:
                     self._macro_DDROP_reset()
-
                 if excite_qubit:
                     # qua.align("FLUX", self._qubit.name)
                     self._qubit.play(qubit_pi_pulse)
@@ -615,7 +614,7 @@ class ReadoutTrainerOctave:
                     self._macro_DDROP_reset()
 
                 if excite_qubit:
-                    # qua.align(self._rr.name, self._qubit.name)
+                    self._qubit.play(qubit_pi_pulse)
                     self._qubit.play(qubit_pi_pulse)
                     qua.align(self._qubitEF, self._qubit)
                     self._qubitEF.play(qubitEF_pi_pulse)

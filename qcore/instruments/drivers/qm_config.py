@@ -48,7 +48,15 @@ class QMConfig(defaultdict):
             if port is not None:
                 self.set_controller_port(mode, port_key, port)
                 self.set_mode_port(mode, port_key, port)
+ 
+    def set_cores(self, name: str, value: str) -> None: # Adrian 10/10/2025
+        if value is not None:
+            self["elements"][name]["core"] = self.cast(value, str, "core")
 
+    def set_upconverters(self, name: str, value: int) -> None: # Kyle 13/03/2026
+        if value is not None:
+            self["elements"][name]["upconverter"] = self.cast(value, int, "upconverter")
+        
     def set_intermediate_frequency(self, name: str, value: float) -> None:
         """ """
         int_freq = self.cast(value, int, "intermediate frequency")
@@ -353,6 +361,8 @@ class QMConfig(defaultdict):
         self.check_voltage_bounds(min(samples), f"'{name}' voltage")
         self.check_voltage_bounds(max(samples), f"'{name}' voltage")
         self["waveforms"][name]["samples"] = samples
+        self["waveforms"][name]["max_allowed_error"] = 1   ### ADRIAN 7th October 2025
+
         logger.debug(f"Set arbitrary waveform '{name}' with {len(samples)} samples.")
 
     def set_digital_waveform(self, waveform: DigitalWaveform, name: str) -> None:

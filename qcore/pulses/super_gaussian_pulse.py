@@ -2,7 +2,7 @@
 import numpy as np
 from qcore.pulses.pulse import Pulse
 
-class GaussianPulse(Pulse):
+class SuperGaussianPulse(Pulse):
     """ """
 
     def __init__(
@@ -38,7 +38,7 @@ class GaussianPulse(Pulse):
         ts = np.linspace(start, stop, length)
         pad = np.zeros(self.pad) if self.pad else []
 
-        i_samples = np.exp(-(ts**2) / (2.0 * self.sigma**2)) *  self.total_I_ampx
+        i_samples = np.exp(-(ts**10) / (2.0 * self.sigma**10)) *  self.total_I_ampx
         i_wave = (np.concatenate((i_samples, pad))).tolist()
 
         if self.Q_ampx is None:

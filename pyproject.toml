@@ -15,12 +15,15 @@ loguru = "^0.6.0"
 pyqtgraph = "^0.13.1"
 h5py = "^3.7.0"
 PyYAML = "^6.0"
-qm-qua = "^1.2.2"
+qm-qua = "^1.2.6"
 pyqt6 = "^6.5.1"
 lmfit = "^1.2.1"
 ipykernel = "^6.24.0"
 matplotlib = "^3.7.2"
 scipy = "^1.11.1"
+betterproto = "^2.0.0b7"
+qualang_tools = "^0.22.0"
+
 
 [build-system]
 requires = ["poetry-core"]

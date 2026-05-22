@@ -161,7 +161,11 @@ class Datasaver:
         # h5dset is a h5py Dataset, to distinguish it from our dataset
         h5dset = self._get_dataset(name)
         index = self._validate_index(dataset, h5dset)
-        h5dset[index] = data
+
+        # EDIT 19/07/25 by JC: Temp fix to ADC bug <----------------------------------------------------------------------------------------------------
+        # h5dset[index] = np.real(data)
+
+        h5dset[index] = np.real(data)
         self._file.flush()
 
         shape = data.shape if isinstance(data, np.ndarray) else len(data)

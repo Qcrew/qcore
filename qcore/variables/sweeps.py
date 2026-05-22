@@ -81,7 +81,6 @@ class Sweep(QuaVariable):
             raise ValueError(f"Badly specified sweep '{self.name}'.")
 
         self.sweep_points = sweep_pts
-
         self.tag = self.name
         self.buffer = self.shape
 
@@ -190,6 +189,7 @@ class RangePoints(SweepPoints):
         self.endpoint = endpoint
         self.step = dtype(step)
         self.stop = stop + step / 2 if endpoint else stop - step / 2
+        # self.stop = stop if endpoint else stop - step
         if dtype is int:
             self.stop = ceil(stop + step / 2) if endpoint else ceil(stop - step / 2)
 

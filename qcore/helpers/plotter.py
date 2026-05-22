@@ -165,7 +165,7 @@ class Plotter:
     MAX_PLOTS = 4
     MAX_COLS = 2
 
-    MAX_DATA_ITEMS: int = 10  # maximum number of traces in one plot
+    MAX_DATA_ITEMS: int = 20  # maximum number of traces in one plot
     SCATTER_DOT_SIZE: int = 6
 
     def __init__(
@@ -298,7 +298,7 @@ class Plotter:
             if plot_item.sceneBoundingRect().contains(position):
                 mouse_point = plot_item.vb.mapSceneToView(position)
                 x, y = mouse_point.x(), mouse_point.y()
-                spacing, coord = "&nbsp;" * 128, f"[{x = :.5g}, {y = :.5g}]"
+                spacing, coord = "&nbsp;" * 128, f"[{x = :.8g}, {y = :.8g}]"
                 text = f"{self._footer_text} <span>{spacing} {coord}</span>"
                 self.footer.setText(text)
                 cx, cy = spec.crosshair
@@ -326,7 +326,7 @@ class Plotter:
                 plot_fit_item = plotspec.plot_fit_items[0]
                 best_fit, fit_params = dataset.fitfn(y, x)
                 self._plot_1D(plot_fit_item, x, best_fit)
-                fit_str = f", ".join(f"{k}: {v:.3g}" for k, v in fit_params.items())
+                fit_str = f", ".join(f"{k}: {v:.6g}" for k, v in fit_params.items())
                 plotspec.fit_label.setText(fit_str)
                 dataset.best_fit, dataset.fit_params = best_fit, fit_params
 
@@ -358,14 +358,18 @@ class Plotter:
         fit_str = ""
         for label, fit_params in all_fit_params.items():
             fit_str += f"[{label}] "
-            fit_str += f", ".join(f"{k}: {v:.3g}" for k, v in fit_params.items())
+            fit_str += f", ".join(f"{k}: {v:.6g}" for k, v in fit_params.items())
             fit_str += "<br>"
         if fit_str:
             plotspec.fit_label.setText(fit_str[:-4])
 
     def _plot_1D(self, plot, x, y):
         """ """
-        plot.setData(x=x, y=y)
+        # EDIT 19/07/25 by JC: Temp fix to ADC bug <----------------------------------------------------------------------------------------------------
+        # plot.setData(x=x, y=np.real(y))
+
+        plot.setData(x=np.real(x), y=np.real(y))
+
 
     def _plot_2D(self, plot, x, y, z):
         """ """

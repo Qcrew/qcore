@@ -24,7 +24,7 @@ def ramp_tanh(length: int, up: bool = True) -> list[float]:
 RAMP_MAP = {"cos": ramp_cos, "cos2": ramp_cos2, "tanh": ramp_tanh}
 
 
-class RampedConstantPulse(ConstantPulse):
+class RampUpPulse(ConstantPulse):
     """ """
 
     def __init__(
@@ -42,7 +42,7 @@ class RampedConstantPulse(ConstantPulse):
     @property
     def total_length(self) -> None:
         """ """
-        return self.ramp * 2 + self.length + self.pad
+        return self.ramp
 
     def sample(self):
         """ """
@@ -55,9 +55,6 @@ class RampedConstantPulse(ConstantPulse):
     def _sample_arbitrary_waveform(self):
         rampfn = RAMP_MAP[self.rampfn] if self.rampfn is not None else False
         up = rampfn(self.ramp, up=True) if rampfn else []
-        samples = np.ones(self.length)
-        down = rampfn(self.ramp, up=False) if rampfn else []
-        pad = np.zeros(self.pad) if self.pad else []
-        i_wave = (np.concatenate((up, samples, down, pad)) * self.total_I_amp).tolist()
+        i_wave = (up * self.total_I_amp).tolist()
 
         return (i_wave, 0.0) if self.has_mixed_waveforms() else (i_wave, None)

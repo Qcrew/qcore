@@ -109,17 +109,18 @@ class QMConfigOPX1000(QMConfig):
         if self.allocate_frequencies_automatically:
             self.set_ducs()
         else:
-            self.set_upconverters_to_1()
+            self._set_upconverters()
         self.set_bands()
 
-    def set_upconverters_to_1(self):
+    def _set_upconverters(self):
         """
         By default, we assume that we only ever have one upconverter, so we set
         all element upconverters to index 1.
         """
         for element in self["elements"].values():
             if "MWInput" in element:
-                element["MWInput"]["upconverter"] = 1
+                element["MWInput"]["upconverter"] = element["upconverter"]
+                del element["upconverter"]
 
     def set_bands(self):
         """
@@ -139,11 +140,20 @@ class QMConfigOPX1000(QMConfig):
         # set MW-FEM bands, assuming always using band 2
         for controller in self["controllers"].values():
             for fem in controller["fems"].values():
+                # print(fem) # used to find out which port is being used
                 if fem["type"] == "MW":
                     for analog_output in fem["analog_outputs"].values():
+
+                        print(analog_output)
                         analog_output["band"] = get_band(analog_output["upconverters"][1]["frequency"])
+
+                         # Band 2 has a 20 ns delay compared to band 1 and 3               # Jon, 08/09/25
+                        if analog_output["band"] == 1 or analog_output["band"] == 3:
+                            analog_output["delay"] = 20
+                        
                     for analog_input in fem["analog_inputs"].values():
                         analog_input["band"] = get_band(analog_input["downconverter_frequency"])
+
 
     def set_ducs(self):
         """

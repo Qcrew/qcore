@@ -4,11 +4,10 @@ import numpy as np
 from qm import SimulationConfig
 
 from qm.QuantumMachine import QuantumMachine
-from qm import QuantumMachinesManager
+from qm import QuantumMachinesManager, Program
 from qm import QmJob
 from qm.api.v2.qmm_api import ControllerOPX1000
 
-from qm.qua._dsl import _ProgramScope
 from qm.octave import QmOctaveConfig
 from qcore.instruments.drivers.qm_octave_setter import OctaveUnit, octave_declaration
 from qcore.helpers.logger import logger
@@ -126,7 +125,7 @@ class QM(Instrument):
         """ """
         return self._status
 
-    def simulate(self, qua_program: _ProgramScope, total_count=None):
+    def simulate(self, qua_program: Program, total_count=None):
         """ """
         if self._config is None or self._qm is None:
             logger.warning("Can't execute program, QM hasn't been opened with a config")
@@ -138,7 +137,7 @@ class QM(Instrument):
             waveform_report.create_plot(samples, plot=True, save_path="./")
             return self._job
 
-    def execute(self, qua_program: _ProgramScope, total_count=None):
+    def execute(self, qua_program: Program, total_count=None):
         """ """
         if self._config is None or self._qm is None:
             logger.warning("Can't execute program, QM hasn't been opened with a config")

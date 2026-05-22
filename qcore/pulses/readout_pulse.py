@@ -28,7 +28,7 @@ class ReadoutPulse(Pulse):
     def __init__(
         self,
         name: str,
-        weights: Union[CosSinWeightTuple, CosSinMinusSinWeightTuple, str] = (
+        weights: Union[CosSinWeightTuple, CosSinMinusSinWeightTuple, str, None] = (
             1.0,
             0.0,  # cos
             0.0,

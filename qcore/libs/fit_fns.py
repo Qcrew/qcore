@@ -77,6 +77,29 @@ def cohstate_decay(y, x):
     result = Model(fn).fit(y, params(y, x), x=x)
     return result.best_fit, result.best_values
 
+def cohstate3_decay(y, x):
+    """ """
+
+    def fn(x, amp, tau, ofs):
+        """
+        Poissonian distribution given photon projection:
+        alpha = alpha0 * exp(-xs / tau)
+        """ 
+        return ofs + amp * np.exp(- 9 * np.exp(-x / tau) )
+
+    def params(y, x):
+        """ """
+        mul = 1 if (x[-1] > x[0]) else -1
+        amp = mul * (y[-1] - y[0])
+        if amp < 0:
+            ofs = np.max(y)
+        else:
+            ofs = np.min(y)
+        tau = x[-1] / 5
+        return create_params( amp=amp, ofs=ofs, tau=tau)
+
+    result = Model(fn).fit(y, params(y, x), x=x)
+    return result.best_fit, result.best_values
 
 def displacement_cal(y, x):
     """ """
