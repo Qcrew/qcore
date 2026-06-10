@@ -7,7 +7,7 @@ from pathlib import Path
 import time
 
 import qm.qua as qua
-from qm.qua._dsl import _ProgramScope, _Variable, _ResultSource
+from qm.qua._dsl import _Variable, _ResultSource
 
 from qcore.instruments.instrument import Instrument
 from qcore.instruments import QM
@@ -351,7 +351,7 @@ class Experiment:
                 self._run_qua_sweeps_simulate()
             else:
                 self._run_qua_sweeps()
-    
+
         except KeyboardInterrupt:
             msg = f"Experiment '{self.name}' interrupted, closing QM now..."
             logger.info(msg)
@@ -563,7 +563,7 @@ class Experiment:
         """Subclass(es) to implement process_data()"""
         pass
 
-    def _build_qua_program(self) -> _ProgramScope:
+    def _build_qua_program(self):
         """ """
         # enter QUA program scope
         with qua.program() as qua_program:
@@ -629,7 +629,7 @@ class Experiment:
             self._filepath = folderpath / filename
             logger.debug(f"Generated filepath {self._filepath} for '{self.name}'")
         return self._filepath
-    
+
     @property
     def metadata(self):
         """ """
